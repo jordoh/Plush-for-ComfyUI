@@ -282,7 +282,8 @@ class Enhancer:
                 "prompt_style": (["Tags", "Narrative"],{"default": "Tags"}),
                 "max_elements" : ("INT", {"max": 25, "min": 3, "step": 1, "default": 10, "display": "number"}),
                 "style_info" : ("BOOLEAN", {"default": False}),
-                "prompt": ("STRING",{"multiline": True})                                
+                "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
+                "prompt": ("STRING",{"multiline": True})
             },
             "optional": {            
                 "image" : ("IMAGE", {"default": None})
@@ -299,7 +300,8 @@ class Enhancer:
     CATEGORY = "Plush/OpenAI"
  
 
-    def gogo(self, GPTmodel, creative_latitude, tokens, example, style, artist, prompt_style, max_elements, style_info, prompt="", image=None):
+    def gogo(self, GPTmodel, creative_latitude, tokens, example, style, artist, prompt_style, max_elements, style_info, seed, prompt="", image=None):
+        # Seed is unused in generation; only present to allow the node to execute again without making any changes to inputs/settings
         
         #If no example text was provided by the user, use my default
    
