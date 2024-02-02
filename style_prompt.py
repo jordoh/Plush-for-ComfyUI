@@ -56,13 +56,17 @@ class cFigSingleton:
      
         self.figInstruction = config_data.get('instruction', "")
         self.figExample = config_data.get('example', "")
+        self.figExample2 = config_data.get('example2', "")
+        self.fig_n_Example = config_data.get('n_example', "")
+        self.fig_n_Example2 = config_data.get('n_example2', "")
+        self._use_examples = False
         self.figStyle = config_data.get('style', "")
         self.figImgInstruction = config_data.get('img_instruction', "")
         self.figImgPromptInstruction = config_data.get('img_prompt_instruction', "")
         self.fig_n_Instruction = config_data.get('n_instruction', "")
         self.fig_n_ImgPromptInstruction = config_data.get('n_img_prompt_instruction', "")
         self.fig_n_ImgInstruction = config_data.get('n_img_instruction', "")
-        self.fig_n_Example = config_data.get('n_example', "")
+        # Help output text
         self.fig_sp_help = config_data.get('sp_help', "")
         try:
          self.figOAIClient = OpenAI(api_key= self._figKey)
@@ -70,6 +74,17 @@ class cFigSingleton:
             print (f"Invalid OpenAI API key: {e}")
             raise
 
+
+    @property
+    def use_examples(self)->bool:
+        return self._use_examples
+
+
+    @use_examples.setter        
+    def use_examples(self, use_examples: bool):
+        #Write-only, sets internal flag
+        self._use_examples = use_examples    
+    
     @property
     def key(self)-> str:
         return self._figKey
@@ -80,8 +95,28 @@ class cFigSingleton:
     
     @property
     def example(self):
-        return self.figExample
+        if self._use_examples:
+            return self.figExample
+        return ""
     
+    @property
+    def example2(self):
+        if self._use_examples:
+            return self.figExample2
+        return ""
+    
+    @property
+    def n_Example(self):
+        if self._use_examples:
+            return self.fig_n_Example
+        return ""
+    
+    @property
+    def n_example2(self):
+        if self._use_examples:
+            return self.fig_n_Example2
+        return ""
+
     @property
     def style(self):
         #make sure the designated default value is present in the list
@@ -111,10 +146,7 @@ class cFigSingleton:
     @property
     def n_ImgInstruction(self):
         return self.fig_n_ImgInstruction
-    
-    @property
-    def n_Example(self):
-        return self.fig_n_Example
+     
     @property
     def sp_help(self):
         return self.fig_sp_help
@@ -175,15 +207,43 @@ class Enhancer:
         # Replace multiple newlines or carriage returns with a single one
         cleaned_text = re.sub(r'\n+', '\n', text).strip()
         return cleaned_text
+    
+    def translateModelName(self, model: str)-> str:
+        #Translate friendly model names to working model names
+        if model == "gpt-4 Turbo":
+            model = "gpt-4-1106-preview"
 
-    def icgptRequest(self, GPTmodel, creative_latitude, tokens, prompt="", instruction="", example="", image=None,) :
+        return model
+    
+
+    def undefined_to_none(self, sus_var):
+        """
+        Converts the string "undefined" to a None.
+
+        Note: ComfyUI returns unconnected UI elements as "undefined"
+        which causes problems when the node expects these to be handled as falsey
+        Args:
+            sus_var(any): The variable that might containt "undefined"
+        Returns:
+            None if the variable is set to the string "undefined" or unchanged (any) if not.
+        """   
+        return None if sus_var == "undefined" else sus_var
+ 
+
+    def icgptRequest(self, GPTmodel, creative_latitude, tokens,  prompt="", prompt_style="", instruction="", image=None,) :
 
         client = self.cFig.openaiClient
+        #These will be empty strings unless cFig.use_examples is set to True
+        example = self.cFig.example
+        example2 = self.cFig.example2
+        n_example = self.cFig.n_Example
+        n_example2 = self.cFig.n_example2
         # There's an image
         if image:
                 
             GPTmodel = "gpt-4-vision-preview"  # Use vision model for image
             image_url = f"data:image/jpeg;base64,{image}"  # Assuming image is base64 encoded
+
            # messages.append({"role": "system", "content": {"type": "image_url", "image_url": {"url": image_url}}})
 
             headers = {
@@ -196,7 +256,7 @@ class Enhancer:
             # Append the user message
             user_content = []
             if prompt:
-                prompt = "PROMPT: " + prompt
+                #prompt = "PROMPT: " + prompt
                 user_content.append({"type": "text", "text": prompt})
 
             user_content.append({"type": "image_url", "image_url": {"url": image_url}})
@@ -206,8 +266,19 @@ class Enhancer:
             if instruction:
                 messages.append({"role": "system", "content": instruction})
             # Append the example in the assistant role
-            if example:
-                messages.append({"role": "assistant", "content": example})
+            # But only if it's not in image + prompt mode, this mode works better with just the instruction
+            # Examples seem to make it difficult for the model to integrate the prompt and imag
+            if self.cFig.use_examples:
+                if prompt_style == "Narrative":
+                    if n_example:
+                        messages.append({"role": "assistant", "content": n_example})
+                    if n_example2:
+                        messages.append({"role": "assistant", "content": n_example2})
+                else:
+                    if example:
+                        messages.append({"role": "assistant", "content": example})
+                    if example2:
+                        messages.append({"role": "assistant", "content": example2})
 
             payload = {
             "model": GPTmodel,
@@ -217,7 +288,9 @@ class Enhancer:
             }
 
             response = requests.post("https://api.openai.com/v1/chat/completions", headers=headers, json=payload)
+
             response_json = response.json()
+            print(f"Plush - Using model: {response_json['model']}")
             CPTG_response = self.clean_response_text(response_json['choices'][0]['message']['content'] )
 
             return CPTG_response
@@ -232,11 +305,21 @@ class Enhancer:
             messages.append({"role": "user", "content": prompt})
         else:
             # User has provided no prompt or image
-            response = "empty box with 'NOTHING' printed on its side bold letters small flying moths dingy gloomy dim light rundown warehouse"
+            response = "empty box with 'NOTHING' printed on its side bold letters small flying moths, dingy, gloomy, dim light rundown warehouse"
             return response
-        if example:
-            messages.append({"role": "assistant", "content": example})            
-        
+
+        if self.cFig.use_examples:
+            if prompt_style == "Narrative":
+                if n_example:
+                        messages.append({"role": "assistant", "content": n_example})
+                if n_example2:
+                        messages.append({"role": "assistant", "content": n_example2})
+            else:
+                if example:
+                        messages.append({"role": "assistant", "content": example})
+                if example2:
+                        messages.append({"role": "assistant", "content": example2})
+            
 
         try:
             response = client.chat.completions.create(
@@ -261,7 +344,8 @@ class Enhancer:
         except Exception as e:
             print(f"An unexpected error occurred: {e}")
             raise   
-        
+
+        print(f"Plush - Using model: {response.model}")
         CPTG_response = response.choices[0].message.content
         return CPTG_response
         
@@ -273,19 +357,18 @@ class Enhancer:
         #Floats have a problem, they go over the max value even when round and step are set, and the node fails.  So I set max a little over the expected input value
         return {
             "required": {
-                "GPTmodel": (["gpt-3.5-turbo","gpt-4","gpt-4-1106-preview"],{"default": "gpt-4"} ),
+                "GPTmodel": (["gpt-3.5-turbo","gpt-4","gpt-4 Turbo"],{"default": "gpt-4 Turbo"} ),
                 "creative_latitude" : ("FLOAT", {"max": 1.201, "min": 0.1, "step": 0.1, "display": "number", "round": 0.1, "default": 0.7}),                  
-                "tokens" : ("INT", {"max": 8000, "min": 20, "step": 10, "default": 500, "display": "number"}),
-                "example" : ("STRING", {"forceInput": True, "multiline": True}),
+                "tokens" : ("INT", {"max": 8000, "min": 20, "step": 10, "default": 500, "display": "number"}),                
                 "style": (iFig.style,{"default": "Photograph"}),
                 "artist" : ("INT", {"max": 3, "min": 0, "step": 1, "default": 1, "display": "number"}),
                 "prompt_style": (["Tags", "Narrative"],{"default": "Tags"}),
                 "max_elements" : ("INT", {"max": 25, "min": 3, "step": 1, "default": 10, "display": "number"}),
                 "style_info" : ("BOOLEAN", {"default": False}),
-                "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff}),
-                "prompt": ("STRING",{"multiline": True})
+                "seed": ("INT", {"default": 0, "min": 0, "max": 0xffffffffffffffff})
             },
-            "optional": {            
+            "optional": {  
+                "prompt": ("STRING",{"multiline": True, "default": ""}),          
                 "image" : ("IMAGE", {"default": None})
             }
         } 
@@ -298,18 +381,15 @@ class Enhancer:
     OUTPUT_NODE = False
 
     CATEGORY = "Plush/OpenAI"
- 
 
     def gogo(self, GPTmodel, creative_latitude, tokens, example, style, artist, prompt_style, max_elements, style_info, seed, prompt="", image=None):
         # Seed is unused in generation; only present to allow the node to execute again without making any changes to inputs/settings
-        
-        #If no example text was provided by the user, use my default
-   
-        if not example:
-            if prompt_style == "Narrative":
-                example = self.cFig.n_Example
-            else:
-                example = self.cFig.example
+
+        # unconnected UI elements get passed in as the string "undefined" by ComfyUI
+        image = self.undefined_to_none(image)
+        prompt = self.undefined_to_none(prompt)
+        #Translate any friendly model names
+        GPTmodel = self.translateModelName(GPTmodel)
         
         help = self.cFig.sp_help
             
@@ -338,7 +418,7 @@ class Enhancer:
  
             CGPT_styleInfo = self.icgptRequest(GPTmodel, creative_latitude, tokens, sty_prompt )
 
-        CGPT_prompt = self.icgptRequest(GPTmodel, creative_latitude, tokens, prompt, instruction, example, image)
+        CGPT_prompt = self.icgptRequest(GPTmodel, creative_latitude, tokens, prompt, prompt_style, instruction, image)
 
     
         return (CGPT_prompt, instruction, CGPT_styleInfo, help)
@@ -510,35 +590,3 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "Enhancer": "Style Prompt",
     "DalleImage": "OAI Dall_e Image"
 }
-#***************TESTING****************************    
-#debug testing mTextSwitch
-""" mTs = mulTextSwitch()
-ddict = mTs.INPUT_TYPES()
-print(ddict)
-tst = ""
-tst = mTs.gogo(2, "String 1 is a long string", "String 2 is a long string", "String 3 is a long string")
-print(tst) """
-
-#debug testing  DalleImage
-""" Di = DalleImage()
-ddict = Di.INPUT_TYPES()
-tst = []
-tst = Di.gogo("dall-e-3", "A woman standing by a flowing river", "1024x1024", "hd", "natural")
-myname = tst[0].names  """
-
-#debug testing Enhancer
-#**********Load and convert test image file*************    
-""" img_convert = DalleImage()
-j_mngr = json_manager()
-image_path = os.path.join(j_mngr.script_dir, 'test_img.png')
-with open(image_path, "rb") as image_file:
-    image_file = base64.b64encode(image_file.read()).decode('utf-8')
-tensor_image, mask = img_convert.b64_to_tensor(image_file)
-tensor_image = None 
-#*************End Image File****************************
-
-Enh = Enhancer()
-Enh.INPUT_TYPES()
-test_resp = Enh.gogo("gpt-4", 0.7, 500, "", "Shallow Depth of Field Photograph", 2, "Tags", 10, False, "using a cane", tensor_image)
-print (test_resp[0])
-print (test_resp[3]) """

@@ -1,6 +1,13 @@
 # Plush-for-ComfyUI
 ****
 ### Updates:
+1/21/23 @7:09PM PST *Revert some of the changes in Version 1.16*
+*  **The addition of 2 sets of examples to facilitate "few shot" learning was too confusing for ChatGPT, I had to revert back to no examples.**  Few shot learning consists of providing the LLM an instruction and several examples of the desired response.  But style prompt's instruction is too complex to mix with examples. When I tried that ChatGPT completely lost the plot. So this has been reverted to no examples.  
+*******************
+1/16/23 @1:00PM PST *Version 1.16*
+*  **Version 1.16, Fixes to unconnected inputs and the "undefined" values they generate, and an additional set of examples to send in the prompt request to ChatGPT.  This will facilitate "few shot" learning for generating prompts**
+*  **A new example workflow has been addded**: *StylePromptBaseOnly.png* in the *Example_Workflows* directory, it's a StylePrompt workflow that uses one KSampler, no Refiner.
+********************
 1/8/23 @6:00pm PST *Version 1.15*
 *  **Version 1.15, adds a new UI field: 'prompt_style' and a 'Help' output to the style_prompt node**
 * **prompt_style**: lets you choose between:
@@ -21,7 +28,7 @@
 ***************
 ### Plush contains two OpenAI enabled nodes:
 
-**Style Prompt**: Takes your: Text prompt, your image, or your text prompt and image, and the art style you specify and generates a prompt from ChatGPT3 or 4 that Stable Diffusion can use to generate an image in that style.
+**Style Prompt**: Takes your: Text prompt, your image, or your text prompt and image, and the art style you specify and generates a prompt from ChatGPT3 or 4 that Stable Diffusion and/or Dall-e can use to generate an image in that style.
 
 
 **OAI Dall_e 3**:  Takes your prompt and parameters and produces a Dall_e3 image in ComfyUI.
@@ -149,7 +156,7 @@ You can use this feature to:
 * Or, of course, any other creative process you can think of
 
 ***
-![ImgStylePmt](https://github.com/glibsonoran/Plush-for-ComfyUI/assets/31249593/7f975898-1305-4ac8-8990-c43019b3f086 "Style_prompt")
+![StylePrompt](https://github.com/glibsonoran/Plush-for-ComfyUI/assets/31249593/fc601470-5b4a-4332-ae55-434cd7b76a0d)
 =======
 
 #### Style Prompt:
@@ -170,11 +177,13 @@ You can use this feature to:
 *CGPTInstruction (optional)*: This will show you the instruction that was sent to ChatGPT along with the prompt.  The instruction tells ChatGPT how to treat the prompt.  It’s pretty much the same every time so typically it’s not worth hooking up after you’ve seen a couple.
 
 *Style Info (optional)*:  If the style_info UI control is set to “true”, this will output a brief backgrounder on the art style you’ve chosen:  This will display important characteristics of the style, its history and the names of some artists who have been influential in that style.  This will require connecting it to a text display box if you’re going to use it.
+
+*Help*:  Hook up a text display node to this output and press the Queue button to see a brief help file that explains the functions of the UI Input elements.
 ****************
 
 **UI inputs**:
 
-*GPTModel (default gpt-4)*:  The ChatGPT model that’s going to generate the prompt. GPT-4 works better than GPT-3.5 turbo, but 3.5 is slightly cheaper to use.  The new GPT-4Turbo is now included as: "gpt-4-1106-preview"
+*GPTModel (default gpt-4)*:  The ChatGPT model that’s going to generate the prompt. GPT-4 works better than GPT-3.5 turbo, but 3.5 is slightly cheaper to use.  The new GPT-4Turbo is now included.
 
 *Creative_lattitude (default 0.7)*:  This is very similar to cfg in the KSampler.  It’s how much freedom the AI model has to creatively interpret your prompt, example and instruction.  Small numbers make the model stick closely to your input, larger ones give it more freedom to improvise.  The actual range is from 0.1 to 2.0, but I’ve found that anything above 1.1 or 1.2 is just disjointed word salad. So I’ve limited the range to 1.2, and even then I don’t go above 0.9.
 
@@ -183,6 +192,8 @@ You can use this feature to:
 *Style (default Photograph)*:  This is the heart of Style Prompt.  I’ve included a list of dozens of art styles to choose from and my instructions tell ChatGPT to build the prompt in a way that pertains to the chosen style.  It’s ChatGPT’s interpretation of the art style, knowledge of artists that work in that style, and what descriptive elements best relate to that style that makes the node effective at depicting the various styles.
 
 *Artist (default 1, range: 0 - 3)*: Whether to include a “style of” statement with the name of 1 to 3 artist(s) that exemplify the style you’ve chosen.  Style Prompt is better at depicting the chosen style if this is set to 1 or greater.  If you don't want to include an artist, set this to 0.
+
+*prompt_style (default, Tags)*:  Let's you choose between two types of prompts: **Narrative**: A prompt style that is long form creative writing with grammatically correct sentences.  This is the preferred form for Dall_e. **Tags**: A prompt style that is terse, a stripped down list of visual elements without conjunctions or grammatical phrasing.  This is the preferred form for Stable Diffusion and Midjourney. 
 
 *Max_elements (default 10)*:  The maximum number of descriptive elements for ChatGPT to include in its generated prompt.  Stable Diffusion gives the highest weighting to text at the beginning of the prompt, and the weighting falls off from there.  There’s definitely a point where long wordy SD prompts result in diminishing returns.  This input lets you limit the length of your prompt.  The range here is from 3 to 25.  I think 6 to 10 works about the best.
 
