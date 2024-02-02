@@ -382,7 +382,7 @@ class Enhancer:
 
     CATEGORY = "Plush/OpenAI"
 
-    def gogo(self, GPTmodel, creative_latitude, tokens, example, style, artist, prompt_style, max_elements, style_info, seed, prompt="", image=None):
+    def gogo(self, GPTmodel, creative_latitude, tokens, style, artist, prompt_style, max_elements, style_info, seed, prompt="", image=None):
         # Seed is unused in generation; only present to allow the node to execute again without making any changes to inputs/settings
 
         # unconnected UI elements get passed in as the string "undefined" by ComfyUI
